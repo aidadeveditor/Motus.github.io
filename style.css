@@ -1,0 +1,9 @@
+::highlight(wa-highlight) {
+  background-color: #ffc107;
+  color: black;
+}
+
+::highlight(wa-sr-highlight) {
+  background-color: #0d6efd;
+  color: white;
+}
