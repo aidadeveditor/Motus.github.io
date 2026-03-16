@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Word Alert",
+  "version": "2.0",
+  "description": "Alerte si des mots sensibles sont détectés sur la page",
+  "permissions": ["activeTab", "storage"],
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_badge_text": ""
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["style.css"]
+    }
+  ]
+}
