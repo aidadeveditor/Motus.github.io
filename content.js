@@ -26,7 +26,7 @@ function findMatchingWords(wordsData) {
 }
 
 // =============================
-// SURLIGNAGE (sans modifier le DOM)
+// SURLIGNAGE
 // =============================
 function highlightWords(words) {
   if (!CSS.highlights) return;
@@ -36,7 +36,7 @@ function highlightWords(words) {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
     const node = walker.currentNode;
-    if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) continue;
+    if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host, #wa-float-host")) continue;
     words.forEach(word => {
       const regex = new RegExp(word, "gi");
       let match;
@@ -48,7 +48,6 @@ function highlightWords(words) {
       }
     });
   }
-
   if (ranges.length > 0) {
     CSS.highlights.set("wa-highlight", new Highlight(...ranges));
   }
@@ -134,14 +133,8 @@ function showHistory() {
     `;
 
     shadow.getElementById("close-btn").addEventListener("click", () => host.remove());
-
     const clearBtn = shadow.getElementById("clear");
-    if (clearBtn) {
-      clearBtn.addEventListener("click", () => {
-        replacementHistory.length = 0;
-        render();
-      });
-    }
+    if (clearBtn) clearBtn.addEventListener("click", () => { replacementHistory.length = 0; render(); });
 
     shadow.querySelectorAll(".undo-btn").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -151,12 +144,19 @@ function showHistory() {
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
         while (walker.nextNode()) {
           const node = walker.currentNode;
-          if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) continue;
+          if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host, #wa-float-host")) continue;
           if (node.nodeValue.includes(h.replacement)) {
             node.nodeValue = node.nodeValue.replace(h.replacement, h.word);
             break;
           }
         }
+        // Undo dans les inputs aussi
+        document.querySelectorAll("input[type='text'], input:not([type]), textarea").forEach(field => {
+          if (field.value.includes(h.replacement)) {
+            field.value = field.value.replace(h.replacement, h.word);
+            field.dispatchEvent(new Event("input"));
+          }
+        });
         replacementHistory.splice(i, 1);
         render();
       });
@@ -229,14 +229,11 @@ function showSuggestions(shadow, word, wordsData) {
       } else if (active && active.isContentEditable) {
         const selection = window.getSelection();
         if (!selection.rangeCount) return;
-        const range = selection.getRangeAt(0);
-        const container = range.startContainer;
+        const container = selection.getRangeAt(0).startContainer;
         if (container.nodeType === Node.TEXT_NODE) {
-          const text = container.nodeValue;
-          const regex = new RegExp(word, "gi");
-          const match = regex.exec(text);
+          const match = new RegExp(word, "gi").exec(container.nodeValue);
           if (match) {
-            container.nodeValue = text.slice(0, match.index) + suggestion + text.slice(match.index + match[0].length);
+            container.nodeValue = container.nodeValue.slice(0, match.index) + suggestion + container.nodeValue.slice(match.index + match[0].length);
           }
         }
       } else {
@@ -244,9 +241,8 @@ function showSuggestions(shadow, word, wordsData) {
         while (walker.nextNode()) {
           const node = walker.currentNode;
           if (node.parentElement.closest("#wa-host")) continue;
-          const regex = new RegExp(word, "i");
-          if (regex.test(node.nodeValue)) {
-            node.nodeValue = node.nodeValue.replace(regex, suggestion);
+          if (new RegExp(word, "i").test(node.nodeValue)) {
+            node.nodeValue = node.nodeValue.replace(new RegExp(word, "i"), suggestion);
             break;
           }
         }
@@ -284,16 +280,12 @@ function showBanner(results, wordsData) {
         justify-content: space-between;
         font-family: sans-serif; box-sizing: border-box; width: 100%;
       }
-      .count {
-        background: #ffc107; color: #333;
-        border-radius: 12px; padding: 2px 8px;
-        font-weight: bold; font-size: 12px;
-      }
+      .count { background: #ffc107; color: #333; border-radius: 12px; padding: 2px 8px; font-weight: bold; font-size: 12px; }
       .wa-word-btn { cursor: pointer; text-decoration: underline dotted; }
       .wa-word-btn:hover { opacity: 0.8; }
       .actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: 12px; }
       #search-replace { background: #0d6efd; color: white; border: none; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; }
-      #history { background: #6c757d; color: white; border: none; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; }
+      #history-btn { background: #6c757d; color: white; border: none; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; }
       #dismiss { background: #856404; color: white; border: none; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; }
       #close { background: none; border: none; font-size: 18px; cursor: pointer; color: #856404; }
       #wa-suggestions {
@@ -315,7 +307,7 @@ function showBanner(results, wordsData) {
       </div>
       <div class="actions">
         <button id="search-replace">🔍 Chercher & Remplacer</button>
-        <button id="history">🕓 Historique</button>
+        <button id="history-btn">🕓 Historique</button>
         <button id="dismiss">Ne plus afficher</button>
         <button id="close">✕</button>
       </div>
@@ -325,9 +317,8 @@ function showBanner(results, wordsData) {
   shadow.querySelectorAll(".wa-word-btn").forEach(btn => {
     btn.addEventListener("click", () => showSuggestions(shadow, btn.dataset.word, wordsData));
   });
-
   shadow.getElementById("search-replace").addEventListener("click", () => showSearchReplace());
-  shadow.getElementById("history").addEventListener("click", () => showHistory());
+  shadow.getElementById("history-btn").addEventListener("click", () => showHistory());
   shadow.getElementById("close").addEventListener("click", () => host.remove());
   shadow.getElementById("dismiss").addEventListener("click", () => {
     host.remove();
@@ -400,20 +391,31 @@ function showSearchReplace() {
     if (!searchWord) return;
 
     const ranges = [];
+
+    // Scan DOM texte
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const node = walker.currentNode;
-      if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) continue;
+      if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host, #wa-float-host")) continue;
       const regex = new RegExp(searchWord, "gi");
       let match;
       while ((match = regex.exec(node.nodeValue)) !== null) {
         const range = new Range();
         range.setStart(node, match.index);
         range.setEnd(node, match.index + match[0].length);
-        matchNodes.push({ node, index: match.index, length: match[0].length, range });
+        matchNodes.push({ type: "dom", node, index: match.index, length: match[0].length, range });
         ranges.push(range);
       }
     }
+
+    // Scan inputs et textareas
+    document.querySelectorAll("input[type='text'], input:not([type]), textarea").forEach(field => {
+      const regex = new RegExp(searchWord, "gi");
+      let match;
+      while ((match = regex.exec(field.value)) !== null) {
+        matchNodes.push({ type: "field", node: field, index: match.index, length: match[0].length });
+      }
+    });
 
     if (ranges.length > 0 && CSS.highlights) {
       CSS.highlights.set("wa-sr-highlight", new Highlight(...ranges));
@@ -422,18 +424,20 @@ function showSearchReplace() {
 
   function updateStatus() {
     const s = shadow.getElementById("status");
-    if (matchNodes.length === 0) {
-      s.textContent = "Aucune occurrence trouvée.";
-    } else {
-      s.textContent = `${currentIndex + 1} / ${matchNodes.length} occurrence${matchNodes.length > 1 ? "s" : ""}`;
-    }
+    s.textContent = matchNodes.length === 0
+      ? "Aucune occurrence trouvée."
+      : `${currentIndex + 1} / ${matchNodes.length} occurrence${matchNodes.length > 1 ? "s" : ""}`;
   }
 
   function scrollToCurrent() {
-    if (matchNodes[currentIndex]) {
-      matchNodes[currentIndex].range.startContainer.parentElement.scrollIntoView({
-        behavior: "smooth", block: "center"
-      });
+    const m = matchNodes[currentIndex];
+    if (!m) return;
+    if (m.type === "dom") {
+      m.range.startContainer.parentElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      m.node.scrollIntoView({ behavior: "smooth", block: "center" });
+      m.node.focus();
+      m.node.setSelectionRange(m.index, m.index + m.length);
     }
   }
 
@@ -446,25 +450,31 @@ function showSearchReplace() {
   });
 
   shadow.getElementById("btn-next").addEventListener("click", () => {
-    if (matchNodes.length === 0) return;
+    if (!matchNodes.length) return;
     currentIndex = (currentIndex + 1) % matchNodes.length;
-    scrollToCurrent();
-    updateStatus();
+    scrollToCurrent(); updateStatus();
   });
 
   shadow.getElementById("btn-prev").addEventListener("click", () => {
-    if (matchNodes.length === 0) return;
+    if (!matchNodes.length) return;
     currentIndex = (currentIndex - 1 + matchNodes.length) % matchNodes.length;
-    scrollToCurrent();
-    updateStatus();
+    scrollToCurrent(); updateStatus();
   });
 
   shadow.getElementById("btn-replace").addEventListener("click", () => {
     if (currentIndex < 0 || !matchNodes[currentIndex]) return;
-    const { node, index, length } = matchNodes[currentIndex];
-    const word = shadow.getElementById("search-input").value.trim();
+    const match = matchNodes[currentIndex];
     const replacement = shadow.getElementById("replace-input").value;
-    node.nodeValue = node.nodeValue.slice(0, index) + replacement + node.nodeValue.slice(index + length);
+    const word = shadow.getElementById("search-input").value.trim();
+
+    if (match.type === "field") {
+      const field = match.node;
+      field.value = field.value.slice(0, match.index) + replacement + field.value.slice(match.index + match.length);
+      field.dispatchEvent(new Event("input"));
+    } else {
+      match.node.nodeValue = match.node.nodeValue.slice(0, match.index) + replacement + match.node.nodeValue.slice(match.index + match.length);
+    }
+
     addToHistory(word, replacement);
     collectMatches(word);
     currentIndex = Math.min(currentIndex, matchNodes.length - 1);
@@ -476,16 +486,25 @@ function showSearchReplace() {
     const replacement = shadow.getElementById("replace-input").value;
     if (!word) return;
 
+    let count = 0;
+
+    // DOM
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
-
-    let count = 0;
     nodes.forEach(node => {
-      if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) return;
-      const regex = new RegExp(word, "gi");
-      if (regex.test(node.nodeValue)) {
+      if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host, #wa-float-host")) return;
+      if (new RegExp(word, "gi").test(node.nodeValue)) {
         node.nodeValue = node.nodeValue.replace(new RegExp(word, "gi"), replacement);
+        count++;
+      }
+    });
+
+    // Inputs et textareas
+    document.querySelectorAll("input[type='text'], input:not([type]), textarea").forEach(field => {
+      if (new RegExp(word, "gi").test(field.value)) {
+        field.value = field.value.replace(new RegExp(word, "gi"), replacement);
+        field.dispatchEvent(new Event("input"));
         count++;
       }
     });
@@ -507,10 +526,9 @@ function showSearchReplace() {
 // =============================
 function watchInputs(wordsData) {
   const words = wordsData.map(w => w.word);
-  document.querySelectorAll("textarea, input[type='text']").forEach(field => {
+  document.querySelectorAll("textarea, input[type='text'], input:not([type])").forEach(field => {
     if (field.dataset.waWatched) return;
     field.dataset.waWatched = "true";
-
     field.addEventListener("input", () => {
       const r = findMatchingWords(wordsData);
       if (Object.keys(r).length > 0) {
@@ -531,8 +549,96 @@ function watchInputs(wordsData) {
 }
 
 // =============================
+// BOUTON FLOTTANT
+// =============================
+function showFloatingButton() {
+  if (document.getElementById("wa-float-host")) return;
+
+  const host = document.createElement("div");
+  host.id = "wa-float-host";
+  host.style.cssText = "position:fixed;bottom:20px;right:20px;z-index:2147483647;";
+  document.documentElement.appendChild(host);
+
+  const shadow = host.attachShadow({ mode: "open" });
+  shadow.innerHTML = `
+    <style>
+      #btn {
+        background: #0d6efd; color: white;
+        border: none; border-radius: 50px;
+        padding: 10px 16px; cursor: pointer;
+        font-size: 13px; font-family: sans-serif;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        display: flex; align-items: center; gap: 6px;
+      }
+      #btn:hover { background: #0b5ed7; }
+    </style>
+    <button id="btn">🔍 Chercher & Remplacer</button>
+  `;
+
+  shadow.getElementById("btn").addEventListener("click", () => showSearchReplace());
+}
+
+// =============================
 // SYNC MULTI-ONGLETS
 // =============================
 function watchStorageChanges() {
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.wordsData) {
+      const newWordsData = changes.wordsData.newValue;
+      const newWords = newWordsData.map(w => w.word);
+      const host = document.getElementById("wa-host");
+      if (host) host.remove();
+      CSS.highlights && CSS.highlights.delete("wa-highlight");
+      const results = findMatchingWords(newWordsData);
+      if (Object.keys(results).length > 0 && sessionStorage.getItem("wa-dismissed") !== "true") {
+        showBanner(results, newWordsData);
+        highlightWords(newWords);
+        updateBadge(results);
+      }
+    }
+  });
+}
+
+// =============================
+// INIT
+// =============================
+let debounceTimer;
+
+window.addEventListener("load", () => {
+  getWords(wordsData => {
+    const words = wordsData.map(w => w.word);
+
+    const results = findMatchingWords(wordsData);
+    if (Object.keys(results).length > 0 && sessionStorage.getItem("wa-dismissed") !== "true") {
+      showBanner(results, wordsData);
+      highlightWords(words);
+      updateBadge(results);
+    }
+
+    showFloatingButton();
+    watchInputs(wordsData);
+    watchStorageChanges();
+
+    const observer = new MutationObserver(() => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const r = findMatchingWords(wordsData);
+        if (Object.keys(r).length > 0) {
+          if (!document.getElementById("wa-host") && sessionStorage.getItem("wa-dismissed") !== "true") {
+            showBanner(r, wordsData);
+          } else {
+            updateBanner(r, wordsData);
+          }
+          highlightWords(words);
+          updateBadge(r);
+        } else {
+          updateBanner({}, wordsData);
+          updateBadge({});
+        }
+        watchInputs(wordsData);
+      }, 300);
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+});
