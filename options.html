@@ -4,27 +4,52 @@
   <meta charset="UTF-8">
   <title>Word Alert — Options</title>
   <style>
-    body { font-family: sans-serif; padding: 30px; max-width: 600px; }
+    body { font-family: sans-serif; padding: 30px; max-width: 700px; }
     h1 { font-size: 20px; }
+    .toolbar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
     .word-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
     .word-row input { padding: 6px 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 13px; }
-    .word-row input:first-child { width: 150px; }
+    .word-row input:first-child { width: 180px; }
     .word-row input:last-child { flex: 1; }
     .word-row button { background: #dc3545; color: white; border: none; padding: 6px 10px; border-radius: 5px; cursor: pointer; }
-    #add-row { background: #0d6efd; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; margin-right: 10px; }
-    #save { background: #198754; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; }
-    #status { color: green; margin-top: 10px; font-size: 13px; }
-    label { font-size: 12px; color: #666; }
+    .btn-primary { background: #0d6efd; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+    .btn-success { background: #198754; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+    .btn-secondary { background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+    #status { color: #198754; font-size: 13px; font-weight: bold; margin-left: 10px; }
+    label { font-size: 12px; color: #666; display: flex; justify-content: space-between; font-weight: bold; padding-bottom: 5px; border-bottom: 1px solid #ccc; margin-bottom: 10px;}
+    .help-text { font-size: 12px; color: #666; background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #0d6efd; }
   </style>
 </head>
 <body>
   <h1>⚙️ Mots à surveiller</h1>
-  <label>Mot surveillé &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Suggestions (séparées par des virgules)</label>
+  
+  <div class="help-text">
+    <strong>💡 Import / Export (Fichier texte)</strong><br>
+    Vous pouvez charger un fichier texte (.txt ou .csv). Le format est simple : 1 ligne = 1 mot.<br>
+    Pour ajouter des suggestions, utilisez un point-virgule (;) : <code>mot; suggestion1, suggestion2</code>
+  </div>
+
+  <div class="toolbar">
+    <button id="add-row" class="btn-primary">+ Ajouter manuellement</button>
+    <button id="export-txt" class="btn-secondary">⬇️ Exporter liste</button>
+    <button id="import-txt" class="btn-secondary">⬆️ Importer liste</button>
+    <input type="file" id="file-input" accept=".txt,.csv" style="display:none;">
+  </div>
+
+  <label>
+    <span style="width:180px">Mot surveillé</span>
+    <span style="flex:1">Suggestions (séparées par des virgules)</span>
+    <span style="width:30px"></span>
+  </label>
+  
   <div id="rows"></div>
+  
   <br>
-  <button id="add-row">+ Ajouter un mot</button>
-  <button id="save">Enregistrer</button>
-  <div id="status"></div>
+  <div style="display: flex; align-items: center;">
+    <button id="save" class="btn-success">Enregistrer les modifications</button>
+    <div id="status"></div>
+  </div>
+
   <script src="options.js"></script>
 </body>
 </html>
