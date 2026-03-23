@@ -36,7 +36,7 @@ function highlightWords(words) {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
     const node = walker.currentNode;
-    if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host, #wa-float-host")) continue;
+    if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) continue;
     words.forEach(word => {
       const regex = new RegExp(word, "gi");
       let match;
@@ -144,13 +144,12 @@ function showHistory() {
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
         while (walker.nextNode()) {
           const node = walker.currentNode;
-          if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host, #wa-float-host")) continue;
+          if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) continue;
           if (node.nodeValue.includes(h.replacement)) {
             node.nodeValue = node.nodeValue.replace(h.replacement, h.word);
             break;
           }
         }
-        // Undo dans les inputs aussi
         document.querySelectorAll("input[type='text'], input:not([type]), textarea").forEach(field => {
           if (field.value.includes(h.replacement)) {
             field.value = field.value.replace(h.replacement, h.word);
@@ -392,11 +391,10 @@ function showSearchReplace() {
 
     const ranges = [];
 
-    // Scan DOM texte
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const node = walker.currentNode;
-      if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host, #wa-float-host")) continue;
+      if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) continue;
       const regex = new RegExp(searchWord, "gi");
       let match;
       while ((match = regex.exec(node.nodeValue)) !== null) {
@@ -408,7 +406,6 @@ function showSearchReplace() {
       }
     }
 
-    // Scan inputs et textareas
     document.querySelectorAll("input[type='text'], input:not([type]), textarea").forEach(field => {
       const regex = new RegExp(searchWord, "gi");
       let match;
@@ -488,19 +485,17 @@ function showSearchReplace() {
 
     let count = 0;
 
-    // DOM
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach(node => {
-      if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host, #wa-float-host")) return;
+      if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) return;
       if (new RegExp(word, "gi").test(node.nodeValue)) {
         node.nodeValue = node.nodeValue.replace(new RegExp(word, "gi"), replacement);
         count++;
       }
     });
 
-    // Inputs et textareas
     document.querySelectorAll("input[type='text'], input:not([type]), textarea").forEach(field => {
       if (new RegExp(word, "gi").test(field.value)) {
         field.value = field.value.replace(new RegExp(word, "gi"), replacement);
@@ -520,6 +515,15 @@ function showSearchReplace() {
     host.remove();
   });
 }
+
+// =============================
+// ÉCOUTE MESSAGE BACKGROUND (Clic Droit)
+// =============================
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "OPEN_SEARCH_REPLACE") {
+    showSearchReplace();
+  }
+});
 
 // =============================
 // ÉCOUTE INPUTS EN TEMPS RÉEL
@@ -546,36 +550,6 @@ function watchInputs(wordsData) {
       }
     });
   });
-}
-
-// =============================
-// BOUTON FLOTTANT
-// =============================
-function showFloatingButton() {
-  if (document.getElementById("wa-float-host")) return;
-
-  const host = document.createElement("div");
-  host.id = "wa-float-host";
-  host.style.cssText = "position:fixed;bottom:20px;right:20px;z-index:2147483647;";
-  document.documentElement.appendChild(host);
-
-  const shadow = host.attachShadow({ mode: "open" });
-  shadow.innerHTML = `
-    <style>
-      #btn {
-        background: #0d6efd; color: white;
-        border: none; border-radius: 50px;
-        padding: 10px 16px; cursor: pointer;
-        font-size: 13px; font-family: sans-serif;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        display: flex; align-items: center; gap: 6px;
-      }
-      #btn:hover { background: #0b5ed7; }
-    </style>
-    <button id="btn">🔍 Chercher & Remplacer</button>
-  `;
-
-  shadow.getElementById("btn").addEventListener("click", () => showSearchReplace());
 }
 
 // =============================
@@ -615,7 +589,6 @@ window.addEventListener("load", () => {
       updateBadge(results);
     }
 
-    showFloatingButton();
     watchInputs(wordsData);
     watchStorageChanges();
 
