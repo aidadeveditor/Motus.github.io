@@ -1,13 +1,23 @@
 // =============================
-// CHARGEMENT DES MOTS
+// CHARGEMENT DEPUIS LES OPTIONS
 // =============================
 function getWords(callback) {
-  const defaultWords = [
-    { word: "confidentiel", suggestions: ["privé", "restreint"] },
-    { word: "secret", suggestions: ["interne", "non public"] }
-  ];
-  chrome.storage.sync.get({ wordsData: defaultWords }, (data) => {
-    callback(data.wordsData);
+  const defaultText = "confidentiel; privé, restreint\nsecret; interne, non public";
+  chrome.storage.sync.get({ rawWords: defaultText }, (data) => {
+    const lines = data.rawWords.split(/\r?\n/);
+    const wordsData = [];
+    
+    lines.forEach(line => {
+      if (!line.trim() || line.trim().startsWith("#")) return;
+      const parts = line.split(";");
+      const word = parts[0].trim();
+      const suggestions = parts[1] ? parts[1].split(",").map(s => s.trim()).filter(Boolean) : [];
+      if (word) {
+        wordsData.push({ word, suggestions });
+      }
+    });
+    
+    callback(wordsData);
   });
 }
 
@@ -283,7 +293,6 @@ function showBanner(results, wordsData) {
       .wa-word-btn { cursor: pointer; text-decoration: underline dotted; }
       .wa-word-btn:hover { opacity: 0.8; }
       .actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: 12px; }
-      #search-replace { background: #0d6efd; color: white; border: none; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; }
       #history-btn { background: #6c757d; color: white; border: none; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; }
       #dismiss { background: #856404; color: white; border: none; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; }
       #close { background: none; border: none; font-size: 18px; cursor: pointer; color: #856404; }
@@ -305,7 +314,6 @@ function showBanner(results, wordsData) {
         <div id="wa-suggestions"></div>
       </div>
       <div class="actions">
-        <button id="search-replace">🔍 Chercher & Remplacer</button>
         <button id="history-btn">🕓 Historique</button>
         <button id="dismiss">Ne plus afficher</button>
         <button id="close">✕</button>
@@ -316,7 +324,6 @@ function showBanner(results, wordsData) {
   shadow.querySelectorAll(".wa-word-btn").forEach(btn => {
     btn.addEventListener("click", () => showSuggestions(shadow, btn.dataset.word, wordsData));
   });
-  shadow.getElementById("search-replace").addEventListener("click", () => showSearchReplace());
   shadow.getElementById("history-btn").addEventListener("click", () => showHistory());
   shadow.getElementById("close").addEventListener("click", () => host.remove());
   shadow.getElementById("dismiss").addEventListener("click", () => {
@@ -326,7 +333,7 @@ function showBanner(results, wordsData) {
 }
 
 // =============================
-// CHERCHER & REMPLACER
+// CHERCHER & REMPLACER (Ouvrable via Clic Droit)
 // =============================
 function showSearchReplace() {
   if (document.getElementById("wa-sr-host")) return;
@@ -390,7 +397,6 @@ function showSearchReplace() {
     if (!searchWord) return;
 
     const ranges = [];
-
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const node = walker.currentNode;
@@ -557,18 +563,23 @@ function watchInputs(wordsData) {
 // =============================
 function watchStorageChanges() {
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.wordsData) {
-      const newWordsData = changes.wordsData.newValue;
-      const newWords = newWordsData.map(w => w.word);
+    if (changes.rawWords) {
       const host = document.getElementById("wa-host");
       if (host) host.remove();
       CSS.highlights && CSS.highlights.delete("wa-highlight");
-      const results = findMatchingWords(newWordsData);
-      if (Object.keys(results).length > 0 && sessionStorage.getItem("wa-dismissed") !== "true") {
-        showBanner(results, newWordsData);
-        highlightWords(newWords);
-        updateBadge(results);
-      }
+      
+      getWords(wordsData => {
+        const words = wordsData.map(w => w.word);
+        const results = findMatchingWords(wordsData);
+        
+        if (Object.keys(results).length > 0 && sessionStorage.getItem("wa-dismissed") !== "true") {
+          showBanner(results, wordsData);
+          highlightWords(words);
+          updateBadge(results);
+        } else {
+          updateBadge({});
+        }
+      });
     }
   });
 }
