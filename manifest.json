@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Word Alert",
-  "version": "2.1",
+  "version": "3.0",
   "description": "Alerte si des mots sensibles sont détectés sur la page",
   "permissions": ["activeTab", "storage", "contextMenus"],
   "options_page": "options.html",
