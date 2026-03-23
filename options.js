@@ -1,50 +1,16 @@
-const defaultWords = [
-  { word: "confidentiel", suggestions: ["privé", "restreint"] },
-  { word: "secret", suggestions: ["interne", "non public"] }
-];
+const defaultText = "confidentiel; privé, restreint\nsecret; interne, non public\nurgent; à traiter";
 
-function renderRows(data) {
-  const container = document.getElementById("rows");
-  container.innerHTML = "";
-  data.forEach((item, i) => {
-    const row = document.createElement("div");
-    row.className = "word-row";
-    row.innerHTML = `
-      <input type="text" class="wa-word" value="${item.word}" placeholder="Mot...">
-      <input type="text" class="wa-suggestions" value="${item.suggestions.join(", ")}" placeholder="suggestion1, suggestion2...">
-      <button data-index="${i}">✕</button>
-    `;
-    container.appendChild(row);
-    row.querySelector("button").addEventListener("click", () => {
-      data.splice(i, 1);
-      renderRows(data);
-    });
-  });
-}
-
-chrome.storage.sync.get({ wordsData: defaultWords }, (data) => {
-  renderRows(data.wordsData);
+// Charger le texte au démarrage
+chrome.storage.sync.get({ rawWords: defaultText }, (data) => {
+  document.getElementById("raw-words").value = data.rawWords;
 });
 
-document.getElementById("add-row").addEventListener("click", () => {
-  const rows = document.querySelectorAll(".word-row");
-  const current = Array.from(rows).map(r => ({
-    word: r.querySelector(".wa-word").value.trim(),
-    suggestions: r.querySelector(".wa-suggestions").value.split(",").map(s => s.trim()).filter(Boolean)
-  }));
-  current.push({ word: "", suggestions: [] });
-  renderRows(current);
-});
-
+// Sauvegarder le texte
 document.getElementById("save").addEventListener("click", () => {
-  const rows = document.querySelectorAll(".word-row");
-  const wordsData = Array.from(rows).map(r => ({
-    word: r.querySelector(".wa-word").value.trim(),
-    suggestions: r.querySelector(".wa-suggestions").value.split(",").map(s => s.trim()).filter(Boolean)
-  })).filter(item => item.word.length > 0);
-
-  chrome.storage.sync.set({ wordsData }, () => {
-    document.getElementById("status").textContent = "✅ Enregistré !";
-    setTimeout(() => document.getElementById("status").textContent = "", 2000);
+  const text = document.getElementById("raw-words").value;
+  chrome.storage.sync.set({ rawWords: text }, () => {
+    const status = document.getElementById("status");
+    status.textContent = "✅ Liste mise à jour sur tous vos onglets !";
+    setTimeout(() => status.textContent = "", 3000);
   });
 });
