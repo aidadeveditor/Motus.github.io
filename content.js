@@ -24,11 +24,15 @@ function getWords(callback) {
 // =============================
 // SCAN + COMPTAGE
 // =============================
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function findMatchingWords(wordsData) {
   const bodyText = document.body.innerText.toLowerCase();
   const results = {};
   wordsData.forEach(({ word }) => {
-    const regex = new RegExp(word.toLowerCase(), "g");
+    const regex = new RegExp(escapeRegex(word.toLowerCase()), "g");
     const matches = bodyText.match(regex);
     if (matches) results[word] = matches.length;
   });
@@ -48,7 +52,7 @@ function highlightWords(words) {
     const node = walker.currentNode;
     if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) continue;
     words.forEach(word => {
-      const regex = new RegExp(word, "gi");
+      const regex = new RegExp(escapeRegex(word), "gi");
       let match;
       while ((match = regex.exec(node.nodeValue)) !== null) {
         const range = new Range();
@@ -151,21 +155,29 @@ function showHistory() {
         const i = parseInt(btn.dataset.index);
         const h = replacementHistory[i];
         if (!h) return;
+        
+        // Annuler dans le DOM (et TipTap)
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
         while (walker.nextNode()) {
           const node = walker.currentNode;
           if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) continue;
           if (node.nodeValue.includes(h.replacement)) {
             node.nodeValue = node.nodeValue.replace(h.replacement, h.word);
+            if (node.parentElement) {
+              node.parentElement.dispatchEvent(new Event("input", { bubbles: true }));
+            }
             break;
           }
         }
+        
+        // Annuler dans les champs input/textarea
         document.querySelectorAll("input[type='text'], input:not([type]), textarea").forEach(field => {
           if (field.value.includes(h.replacement)) {
             field.value = field.value.replace(h.replacement, h.word);
-            field.dispatchEvent(new Event("input"));
+            field.dispatchEvent(new Event("input", { bubbles: true }));
           }
         });
+        
         replacementHistory.splice(i, 1);
         render();
       });
@@ -220,11 +232,13 @@ function showSuggestions(shadow, word, wordsData) {
     el.addEventListener("click", () => {
       const suggestion = el.dataset.suggestion;
       const active = document.activeElement;
+      const safeWord = escapeRegex(word);
 
+      // Cas 1 : Input ou Textarea
       if (active && (active.tagName === "TEXTAREA" || active.tagName === "INPUT")) {
         const start = active.selectionStart;
         const val = active.value;
-        const regex = new RegExp(word, "gi");
+        const regex = new RegExp(safeWord, "gi");
         const fromCursor = val.slice(start);
         const match = regex.exec(fromCursor);
         if (match) {
@@ -232,26 +246,36 @@ function showSuggestions(shadow, word, wordsData) {
           active.value = val.slice(0, pos) + suggestion + val.slice(pos + match[0].length);
           active.setSelectionRange(pos + suggestion.length, pos + suggestion.length);
         } else {
-          active.value = val.replace(new RegExp(word, "i"), suggestion);
+          active.value = val.replace(new RegExp(safeWord, "i"), suggestion);
         }
-        active.dispatchEvent(new Event("input"));
-      } else if (active && active.isContentEditable) {
+        active.dispatchEvent(new Event("input", { bubbles: true }));
+      } 
+      // Cas 2 : TipTap ou ContentEditable
+      else if (active && active.isContentEditable) {
         const selection = window.getSelection();
         if (!selection.rangeCount) return;
         const container = selection.getRangeAt(0).startContainer;
         if (container.nodeType === Node.TEXT_NODE) {
-          const match = new RegExp(word, "gi").exec(container.nodeValue);
+          const match = new RegExp(safeWord, "gi").exec(container.nodeValue);
           if (match) {
             container.nodeValue = container.nodeValue.slice(0, match.index) + suggestion + container.nodeValue.slice(match.index + match[0].length);
+            if (container.parentElement) {
+              container.parentElement.dispatchEvent(new Event("input", { bubbles: true }));
+            }
           }
         }
-      } else {
+      } 
+      // Cas 3 : N'importe où sur la page
+      else {
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
         while (walker.nextNode()) {
           const node = walker.currentNode;
           if (node.parentElement.closest("#wa-host")) continue;
-          if (new RegExp(word, "i").test(node.nodeValue)) {
-            node.nodeValue = node.nodeValue.replace(new RegExp(word, "i"), suggestion);
+          if (new RegExp(safeWord, "i").test(node.nodeValue)) {
+            node.nodeValue = node.nodeValue.replace(new RegExp(safeWord, "i"), suggestion);
+            if (node.parentElement) {
+              node.parentElement.dispatchEvent(new Event("input", { bubbles: true }));
+            }
             break;
           }
         }
@@ -366,7 +390,7 @@ function showSearchReplace() {
       #btn-replace { background: #ffc107; color: #333; font-weight: bold; }
       #btn-replace-all { background: #fd7e14; color: white; font-weight: bold; }
       #btn-close { background: #dc3545; color: white; }
-      #status { font-size: 12px; color: #666; min-height: 18px; }
+      #status { font-size: 12px; color: #666; min-height: 18px; margin-top: 5px;}
     </style>
     <div id="panel">
       <h3>🔍 Chercher & Remplacer</h3>
@@ -397,11 +421,14 @@ function showSearchReplace() {
     if (!searchWord) return;
 
     const ranges = [];
+    const safeWord = escapeRegex(searchWord);
+
+    // Scan Textes (DOM, TipTap)
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const node = walker.currentNode;
       if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) continue;
-      const regex = new RegExp(searchWord, "gi");
+      const regex = new RegExp(safeWord, "gi");
       let match;
       while ((match = regex.exec(node.nodeValue)) !== null) {
         const range = new Range();
@@ -412,8 +439,9 @@ function showSearchReplace() {
       }
     }
 
+    // Scan Champs de formulaires
     document.querySelectorAll("input[type='text'], input:not([type]), textarea").forEach(field => {
-      const regex = new RegExp(searchWord, "gi");
+      const regex = new RegExp(safeWord, "gi");
       let match;
       while ((match = regex.exec(field.value)) !== null) {
         matchNodes.push({ type: "field", node: field, index: match.index, length: match[0].length });
@@ -473,9 +501,13 @@ function showSearchReplace() {
     if (match.type === "field") {
       const field = match.node;
       field.value = field.value.slice(0, match.index) + replacement + field.value.slice(match.index + match.length);
-      field.dispatchEvent(new Event("input"));
+      field.dispatchEvent(new Event("input", { bubbles: true }));
     } else {
       match.node.nodeValue = match.node.nodeValue.slice(0, match.index) + replacement + match.node.nodeValue.slice(match.index + match.length);
+      // 🔥 Indispensable pour que TipTap enregistre le changement
+      if (match.node.parentElement) {
+        match.node.parentElement.dispatchEvent(new Event("input", { bubbles: true }));
+      }
     }
 
     addToHistory(word, replacement);
@@ -490,22 +522,29 @@ function showSearchReplace() {
     if (!word) return;
 
     let count = 0;
+    const safeWord = escapeRegex(word);
 
+    // Remplacement DOM (TipTap)
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach(node => {
       if (node.parentElement.closest("#wa-host, #wa-sr-host, #wa-history-host")) return;
-      if (new RegExp(word, "gi").test(node.nodeValue)) {
-        node.nodeValue = node.nodeValue.replace(new RegExp(word, "gi"), replacement);
+      if (new RegExp(safeWord, "gi").test(node.nodeValue)) {
+        node.nodeValue = node.nodeValue.replace(new RegExp(safeWord, "gi"), replacement);
+        // 🔥 Indispensable pour TipTap
+        if (node.parentElement) {
+          node.parentElement.dispatchEvent(new Event("input", { bubbles: true }));
+        }
         count++;
       }
     });
 
+    // Remplacement Inputs
     document.querySelectorAll("input[type='text'], input:not([type]), textarea").forEach(field => {
-      if (new RegExp(word, "gi").test(field.value)) {
-        field.value = field.value.replace(new RegExp(word, "gi"), replacement);
-        field.dispatchEvent(new Event("input"));
+      if (new RegExp(safeWord, "gi").test(field.value)) {
+        field.value = field.value.replace(new RegExp(safeWord, "gi"), replacement);
+        field.dispatchEvent(new Event("input", { bubbles: true }));
         count++;
       }
     });
