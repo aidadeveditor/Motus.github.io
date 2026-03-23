@@ -1,4 +1,4 @@
-// Création du bouton dans le menu du clic droit (context menu) à l'installation
+// Création du bouton dans le menu du clic droit à l'installation
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "wa-search-replace",
