@@ -22,10 +22,12 @@ function renderRows(data) {
   });
 }
 
+// Au chargement
 chrome.storage.sync.get({ wordsData: defaultWords }, (data) => {
   renderRows(data.wordsData);
 });
 
+// Ajouter ligne manuelle
 document.getElementById("add-row").addEventListener("click", () => {
   const rows = document.querySelectorAll(".word-row");
   const current = Array.from(rows).map(r => ({
@@ -36,6 +38,7 @@ document.getElementById("add-row").addEventListener("click", () => {
   renderRows(current);
 });
 
+// Enregistrer
 document.getElementById("save").addEventListener("click", () => {
   const rows = document.querySelectorAll(".word-row");
   const wordsData = Array.from(rows).map(r => ({
@@ -45,6 +48,59 @@ document.getElementById("save").addEventListener("click", () => {
 
   chrome.storage.sync.set({ wordsData }, () => {
     document.getElementById("status").textContent = "✅ Enregistré !";
-    setTimeout(() => document.getElementById("status").textContent = "", 2000);
+    setTimeout(() => document.getElementById("status").textContent = "", 3000);
   });
+});
+
+// Exporter liste en TXT
+document.getElementById("export-txt").addEventListener("click", () => {
+  const rows = document.querySelectorAll(".word-row");
+  let content = "";
+  rows.forEach(r => {
+    const word = r.querySelector(".wa-word").value.trim();
+    const sug = r.querySelector(".wa-suggestions").value.trim();
+    if (word) {
+      content += sug ? `${word}; ${sug}\n` : `${word}\n`;
+    }
+  });
+
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "mots_surveilles.txt";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// Importer liste
+document.getElementById("import-txt").addEventListener("click", () => {
+  document.getElementById("file-input").click();
+});
+
+document.getElementById("file-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const text = event.target.result;
+    const lines = text.split(/\r?\n/);
+    const importedData = [];
+
+    lines.forEach(line => {
+      if (!line.trim()) return;
+      const parts = line.split(";");
+      const word = parts[0].trim();
+      const suggestions = parts[1] ? parts[1].split(",").map(s => s.trim()).filter(Boolean) : [];
+      if (word) {
+        importedData.push({ word, suggestions });
+      }
+    });
+
+    renderRows(importedData);
+    document.getElementById("status").textContent = "Fichier chargé. Cliquez sur Enregistrer !";
+    e.target.value = ""; // Réinitialise l'input
+  };
+  reader.readAsText(file);
 });
